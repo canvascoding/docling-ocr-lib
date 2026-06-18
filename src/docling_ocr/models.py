@@ -38,13 +38,17 @@ class ProcessedDocument:
 
 class AnnotationConfig(BaseModel):
     prompt: str = (
-        "Generate concise, natural-language descriptions for each individual visual element "
-        "(image, diagram, table, chart, etc.) on the page. Focus on summarizing what each "
-        "visual element contains or conveys."
+        "Describe this visual element in one short, precise sentence. Focus only on the "
+        "main chart, diagram, table, formula, graph, or visible key message. If it is only "
+        "a logo, icon, or decorative image, say that briefly."
     )
     model: str = "qwen25_vl_3b_mlx"
     remote_api_url: str | None = None
     remote_api_key: str | None = None
+    max_tokens: int = 80
+    max_chars: int = 280
+    skip_small_images: bool = True
+    min_area_ratio: float = 0.015
 
 
 class DoclingConfig(BaseModel):

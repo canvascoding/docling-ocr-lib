@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "docling-ocr"
-version = "0.1.1"
+version = "0.1.2"
 description = "Python library for local document OCR processing using Docling, with configurable storage backends"
 readme = "README.md"
 requires-python = ">=3.10"

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import logging
+import re
 import tempfile
 from typing import TYPE_CHECKING
 
@@ -21,6 +22,7 @@ DEFAULT_SYSTEM_PROMPT = (
 DEFAULT_USER_PROMPT = "Describe this image from a university lecture slide."
 DEFAULT_MAX_TOKENS = 80
 _MODEL_CACHE: dict[str, tuple[object, object]] = {}
+_WHITESPACE_RE = re.compile(r"\s+")
 
 
 def _resolve_repo_id(model_name: str, artifacts_path: str | None = None) -> str:
@@ -66,6 +68,82 @@ def _load_mlx_model(repo_id: str):
     return _MODEL_CACHE[repo_id]
 
 
+def _trim_annotation(text: str, max_chars: int) -> str:
+    normalized = _WHITESPACE_RE.sub(" ", text).strip()
+    if max_chars <= 0 or len(normalized) <= max_chars:
+        return normalized
+
+    sentence_cut = max(
+        normalized.rfind(".", 0, max_chars), normalized.rfind("!", 0, max_chars), normalized.rfind("?", 0, max_chars)
+    )
+    if sentence_cut >= max_chars // 2:
+        return normalized[: sentence_cut + 1].strip()
+
+    word_cut = normalized.rfind(" ", 0, max_chars - 3)
+    if word_cut <= 0:
+        word_cut = max_chars - 3
+    return normalized[:word_cut].rstrip(" ,;:") + "..."
+
+
+def _get_page_dimensions(document: object, page_no: int) -> tuple[float, float] | None:
+    pages = getattr(document, "pages", None)
+    page = None
+    if isinstance(pages, dict):
+        page = pages.get(page_no) or pages.get(page_no - 1)
+    elif isinstance(pages, list | tuple):
+        index = page_no - 1 if page_no > 0 else page_no
+        if isinstance(index, int) and 0 <= index < len(pages):
+            page = pages[index]
+
+    size = getattr(page, "size", None)
+    width = getattr(size, "width", None)
+    height = getattr(size, "height", None)
+    try:
+        width_f = float(width)
+        height_f = float(height)
+    except (TypeError, ValueError):
+        return None
+    if width_f <= 0 or height_f <= 0:
+        return None
+    return width_f, height_f
+
+
+def _picture_area_ratio(picture: object, document: object) -> float | None:
+    for prov in getattr(picture, "prov", None) or []:
+        bbox = getattr(prov, "bbox", None)
+        page_no = getattr(prov, "page_no", None)
+        if bbox is None or not isinstance(page_no, int):
+            continue
+
+        dims = _get_page_dimensions(document, page_no)
+        if dims is None:
+            continue
+
+        try:
+            left = float(getattr(bbox, "l"))
+            right = float(getattr(bbox, "r"))
+            top = float(getattr(bbox, "t"))
+            bottom = float(getattr(bbox, "b"))
+        except (AttributeError, TypeError, ValueError):
+            continue
+
+        area = abs(right - left) * abs(bottom - top)
+        page_area = dims[0] * dims[1]
+        if page_area > 0:
+            return area / page_area
+    return None
+
+
+def _should_annotate_picture(picture: object, document: object, config: AnnotationConfig) -> bool:
+    if not config.skip_small_images:
+        return True
+
+    ratio = _picture_area_ratio(picture, document)
+    if ratio is None:
+        return True
+    return ratio >= config.min_area_ratio
+
+
 def describe_image_with_mlx_vlm(
     image: Image.Image,
     config: AnnotationConfig,
@@ -104,13 +182,14 @@ def describe_image_with_mlx_vlm(
             processor,
             prompt=prompt,
             image=[tmp.name],
-            max_tokens=DEFAULT_MAX_TOKENS,
+            max_tokens=config.max_tokens or DEFAULT_MAX_TOKENS,
             temperature=0.0,
             verbose=False,
         )
 
     text = getattr(output, "text", output)
     text = text.strip() if isinstance(text, str) else str(text).strip()
+    text = _trim_annotation(text, config.max_chars)
     logger.debug("Generated annotation: %s", text[:200])
     return text
 
@@ -139,6 +218,14 @@ def generate_vlm_annotations(
     for i, picture in enumerate(pictures):
         ref = getattr(picture, "self_ref", "") or f"pic_{i}"
         try:
+            if not _should_annotate_picture(picture, document, config):
+                logger.info(
+                    "Skipping small picture %s below annotation area threshold %.4f",
+                    ref,
+                    config.min_area_ratio,
+                )
+                continue
+
             if hasattr(picture, "get_image"):
                 image = picture.get_image(document)
             elif hasattr(picture, "image"):

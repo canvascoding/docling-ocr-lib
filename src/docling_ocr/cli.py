@@ -171,6 +171,29 @@ def main(verbose: bool) -> None:
     help="Prompt for picture annotations",
 )
 @click.option(
+    "--annotation-max-tokens",
+    default=AnnotationConfig().max_tokens,
+    type=int,
+    help="Maximum VLM output tokens for each picture annotation",
+)
+@click.option(
+    "--annotation-max-chars",
+    default=AnnotationConfig().max_chars,
+    type=int,
+    help="Maximum characters stored for each picture annotation",
+)
+@click.option(
+    "--annotation-skip-small-images/--annotation-include-small-images",
+    default=AnnotationConfig().skip_small_images,
+    help="Skip tiny pictures such as logos before VLM annotation",
+)
+@click.option(
+    "--annotation-min-area-ratio",
+    default=AnnotationConfig().min_area_ratio,
+    type=float,
+    help="Minimum page area ratio required for picture annotation",
+)
+@click.option(
     "--artifacts-path", envvar="DOCLING_ARTIFACTS_PATH", default=None, help="Local model artifacts path for offline use"
 )
 @click.option("--no-ocr", is_flag=True, help="Disable OCR (text-layer only)")
@@ -192,6 +215,10 @@ def process(
     picture_annotations: bool,
     annotation_model: str,
     annotation_prompt: str,
+    annotation_max_tokens: int,
+    annotation_max_chars: int,
+    annotation_skip_small_images: bool,
+    annotation_min_area_ratio: float,
     artifacts_path: str | None,
     no_ocr: bool,
     max_pages: int | None,
@@ -212,6 +239,10 @@ def process(
     annotation_config = AnnotationConfig(
         prompt=annotation_prompt,
         model=annotation_model,
+        max_tokens=annotation_max_tokens,
+        max_chars=annotation_max_chars,
+        skip_small_images=annotation_skip_small_images,
+        min_area_ratio=annotation_min_area_ratio,
     )
 
     try:
@@ -254,6 +285,29 @@ def process(
 @click.option("--vlm-model", default="granite_docling_mlx", help="VLM model for --pipeline=vlm")
 @click.option("--picture-annotations", is_flag=True, help="Enable VLM picture descriptions")
 @click.option("--annotation-model", default="qwen25_vl_3b_mlx", help="Model for picture annotations")
+@click.option(
+    "--annotation-max-tokens",
+    default=AnnotationConfig().max_tokens,
+    type=int,
+    help="Maximum VLM output tokens for each picture annotation",
+)
+@click.option(
+    "--annotation-max-chars",
+    default=AnnotationConfig().max_chars,
+    type=int,
+    help="Maximum characters stored for each picture annotation",
+)
+@click.option(
+    "--annotation-skip-small-images/--annotation-include-small-images",
+    default=AnnotationConfig().skip_small_images,
+    help="Skip tiny pictures such as logos before VLM annotation",
+)
+@click.option(
+    "--annotation-min-area-ratio",
+    default=AnnotationConfig().min_area_ratio,
+    type=float,
+    help="Minimum page area ratio required for picture annotation",
+)
 @click.option("--artifacts-path", envvar="DOCLING_ARTIFACTS_PATH", default=None, help="Local model artifacts path")
 @click.option("--no-ocr", is_flag=True, help="Disable OCR (text-layer only)")
 @click.option("--batch-delay", default=0.0, help="Delay between files in seconds")
@@ -272,6 +326,10 @@ def batch(
     vlm_model: str,
     picture_annotations: bool,
     annotation_model: str,
+    annotation_max_tokens: int,
+    annotation_max_chars: int,
+    annotation_skip_small_images: bool,
+    annotation_min_area_ratio: float,
     artifacts_path: str | None,
     no_ocr: bool,
     batch_delay: float,
@@ -297,7 +355,13 @@ def batch(
         s3_secret_access_key,
     )
 
-    annotation_config = AnnotationConfig(model=annotation_model)
+    annotation_config = AnnotationConfig(
+        model=annotation_model,
+        max_tokens=annotation_max_tokens,
+        max_chars=annotation_max_chars,
+        skip_small_images=annotation_skip_small_images,
+        min_area_ratio=annotation_min_area_ratio,
+    )
 
     with DoclingPipeline(
         storage=storage_backend,
