@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import logging
+import tempfile
 from typing import TYPE_CHECKING
 
 from docling_ocr.models import AnnotationConfig
@@ -13,12 +14,13 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_SYSTEM_PROMPT = (
     "You are an expert assistant describing images from university lecture slides. "
-    "Describe each image accurately in 2-4 sentences. Focus on the main message, "
-    "any diagrams, charts, formulas, tables, graphs, or key text visible. "
-    "Be concise but informative."
+    "Describe each image accurately in one concise sentence. Focus only on the "
+    "main chart, diagram, table, formula, graph, or visible key message. Do not speculate."
 )
 
 DEFAULT_USER_PROMPT = "Describe this image from a university lecture slide."
+DEFAULT_MAX_TOKENS = 80
+_MODEL_CACHE: dict[str, tuple[object, object]] = {}
 
 
 def _resolve_repo_id(model_name: str, artifacts_path: str | None = None) -> str:
@@ -52,6 +54,18 @@ def _resolve_repo_id(model_name: str, artifacts_path: str | None = None) -> str:
     return repo_id
 
 
+def _load_mlx_model(repo_id: str):
+    try:
+        from mlx_vlm import load
+    except ImportError as e:
+        raise ImportError("mlx-vlm is required for local image annotation") from e
+
+    if repo_id not in _MODEL_CACHE:
+        logger.info("Loading MLX-VLM annotation model: %s", repo_id)
+        _MODEL_CACHE[repo_id] = load(repo_id)
+    return _MODEL_CACHE[repo_id]
+
+
 def describe_image_with_mlx_vlm(
     image: Image.Image,
     config: AnnotationConfig,
@@ -59,7 +73,8 @@ def describe_image_with_mlx_vlm(
 ) -> str:
     """Describe an image using a local MLX-VLM model via mlx_vlm."""
     try:
-        from mlx_vlm import generate, load
+        from mlx_vlm import generate
+        from mlx_vlm.prompt_utils import apply_chat_template
     except ImportError as e:
         raise ImportError("mlx-vlm is required for local image annotation") from e
 
@@ -67,24 +82,35 @@ def describe_image_with_mlx_vlm(
     system_prompt = config.prompt or DEFAULT_SYSTEM_PROMPT
     user_prompt = DEFAULT_USER_PROMPT
 
-    logger.info("Loading MLX-VLM annotation model: %s", repo_id)
-    model, processor = load(repo_id)
+    model, processor = _load_mlx_model(repo_id)
 
     buf = io.BytesIO()
     image.convert("RGB").save(buf, format="JPEG")
     buf.seek(0)
 
-    logger.debug("Generating annotation for image")
-    output = generate(
-        model,
-        processor,
-        image=buf,
-        prompt=user_prompt,
-        system=system_prompt,
-        verbose=False,
-    )
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt},
+    ]
+    prompt = apply_chat_template(processor, model.config, messages, num_images=1)
 
-    text = output.strip() if isinstance(output, str) else str(output).strip()
+    with tempfile.NamedTemporaryFile(suffix=".jpg") as tmp:
+        tmp.write(buf.getvalue())
+        tmp.flush()
+
+        logger.debug("Generating annotation for image")
+        output = generate(
+            model,
+            processor,
+            prompt=prompt,
+            image=[tmp.name],
+            max_tokens=DEFAULT_MAX_TOKENS,
+            temperature=0.0,
+            verbose=False,
+        )
+
+    text = getattr(output, "text", output)
+    text = text.strip() if isinstance(text, str) else str(text).strip()
     logger.debug("Generated annotation: %s", text[:200])
     return text
 
