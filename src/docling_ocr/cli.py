@@ -40,11 +40,27 @@ SUPPORTED_EXTENSIONS = {
 }
 
 
-def _get_storage(storage_type: str, output_dir: str, s3_bucket: str | None, s3_region: str) -> object:
+def _get_storage(
+    storage_type: str,
+    output_dir: str,
+    s3_bucket: str | None,
+    s3_region: str,
+    s3_endpoint_url: str | None,
+    s3_public_base_url: str | None,
+    s3_access_key_id: str | None,
+    s3_secret_access_key: str | None,
+) -> object:
     if storage_type == "s3":
         if not s3_bucket:
             raise click.UsageError("--s3-bucket is required when --storage=s3")
-        return S3StorageBackend(bucket=s3_bucket, region=s3_region)
+        return S3StorageBackend(
+            bucket=s3_bucket,
+            region=s3_region,
+            endpoint_url=s3_endpoint_url,
+            public_base_url=s3_public_base_url,
+            access_key_id=s3_access_key_id,
+            secret_access_key=s3_secret_access_key,
+        )
     return LocalStorageBackend(output_dir=output_dir)
 
 
@@ -124,6 +140,10 @@ def main(verbose: bool) -> None:
 @click.option("--output-dir", default="./output", help="Output directory for local storage")
 @click.option("--s3-bucket", envvar="S3_BUCKET", help="S3 bucket name")
 @click.option("--s3-region", envvar="S3_REGION", default="eu-central-1", help="S3 region")
+@click.option("--s3-endpoint-url", envvar="S3_ENDPOINT_URL", default=None, help="S3 endpoint URL (for R2/MinIO)")
+@click.option("--s3-public-base-url", envvar="S3_PUBLIC_BASE_URL", default=None, help="Public base URL for S3 objects")
+@click.option("--s3-access-key-id", envvar="S3_ACCESS_KEY_ID", default=None, help="S3 access key ID")
+@click.option("--s3-secret-access-key", envvar="S3_SECRET_ACCESS_KEY", default=None, help="S3 secret access key")
 @click.option(
     "--pipeline",
     type=click.Choice(["standard", "vlm"]),
@@ -163,6 +183,10 @@ def process(
     output_dir: str,
     s3_bucket: str | None,
     s3_region: str,
+    s3_endpoint_url: str | None,
+    s3_public_base_url: str | None,
+    s3_access_key_id: str | None,
+    s3_secret_access_key: str | None,
     pipeline: str,
     vlm_model: str,
     picture_annotations: bool,
@@ -174,7 +198,16 @@ def process(
     max_file_size: int | None,
     no_subfolder: bool,
 ) -> None:
-    storage_backend = _get_storage(storage, output_dir, s3_bucket, s3_region)
+    storage_backend = _get_storage(
+        storage,
+        output_dir,
+        s3_bucket,
+        s3_region,
+        s3_endpoint_url,
+        s3_public_base_url,
+        s3_access_key_id,
+        s3_secret_access_key,
+    )
 
     annotation_config = AnnotationConfig(
         prompt=annotation_prompt,
@@ -208,6 +241,10 @@ def process(
 @click.option("--output-dir", default="./output", help="Output directory for local storage")
 @click.option("--s3-bucket", envvar="S3_BUCKET", help="S3 bucket name")
 @click.option("--s3-region", envvar="S3_REGION", default="eu-central-1", help="S3 region")
+@click.option("--s3-endpoint-url", envvar="S3_ENDPOINT_URL", default=None, help="S3 endpoint URL (for R2/MinIO)")
+@click.option("--s3-public-base-url", envvar="S3_PUBLIC_BASE_URL", default=None, help="Public base URL for S3 objects")
+@click.option("--s3-access-key-id", envvar="S3_ACCESS_KEY_ID", default=None, help="S3 access key ID")
+@click.option("--s3-secret-access-key", envvar="S3_SECRET_ACCESS_KEY", default=None, help="S3 secret access key")
 @click.option(
     "--pipeline",
     type=click.Choice(["standard", "vlm"]),
@@ -227,6 +264,10 @@ def batch(
     output_dir: str,
     s3_bucket: str | None,
     s3_region: str,
+    s3_endpoint_url: str | None,
+    s3_public_base_url: str | None,
+    s3_access_key_id: str | None,
+    s3_secret_access_key: str | None,
     pipeline: str,
     vlm_model: str,
     picture_annotations: bool,
@@ -245,7 +286,16 @@ def batch(
 
     click.echo(f"Found {len(doc_files)} document(s) to process.")
 
-    storage_backend = _get_storage(storage, output_dir, s3_bucket, s3_region)
+    storage_backend = _get_storage(
+        storage,
+        output_dir,
+        s3_bucket,
+        s3_region,
+        s3_endpoint_url,
+        s3_public_base_url,
+        s3_access_key_id,
+        s3_secret_access_key,
+    )
 
     annotation_config = AnnotationConfig(model=annotation_model)
 

@@ -14,6 +14,10 @@ class S3StorageBackend(StorageBackend):
         bucket: str,
         region: str = "eu-central-1",
         prefix: str = "",
+        endpoint_url: str | None = None,
+        public_base_url: str | None = None,
+        access_key_id: str | None = None,
+        secret_access_key: str | None = None,
     ) -> None:
         try:
             import boto3
@@ -23,11 +27,32 @@ class S3StorageBackend(StorageBackend):
         self._bucket = bucket
         self._region = region
         self._prefix = prefix.rstrip("/")
-        self._s3_client = boto3.client("s3", region_name=region)
-        logger.info("S3StorageBackend initialized (bucket=%s, region=%s, prefix=%s)", bucket, region, prefix)
+        self._endpoint_url = endpoint_url
+        self._public_base_url = public_base_url.rstrip("/") if public_base_url else None
+
+        client_kwargs: dict = {"region_name": region}
+        if endpoint_url:
+            client_kwargs["endpoint_url"] = endpoint_url
+        if access_key_id and secret_access_key:
+            client_kwargs["aws_access_key_id"] = access_key_id
+            client_kwargs["aws_secret_access_key"] = secret_access_key
+
+        self._s3_client = boto3.client("s3", **client_kwargs)
+        logger.info(
+            "S3StorageBackend initialized (bucket=%s, region=%s, prefix=%s, endpoint=%s, public_base_url=%s)",
+            bucket,
+            region,
+            prefix,
+            endpoint_url,
+            self._public_base_url,
+        )
 
     @property
     def base_url(self) -> str:
+        if self._public_base_url:
+            return self._public_base_url
+        if self._endpoint_url:
+            return self._endpoint_url.rstrip("/")
         return f"https://{self._bucket}.s3.{self._region}.amazonaws.com"
 
     def upload(self, file_data: bytes, filename: str, content_type: str = "image/png") -> str:

@@ -299,8 +299,10 @@ class DoclingPipeline:
             logger.warning("Failed to extract image %s on page %d: %s", pic_ref, page_index, e)
             return None
 
-        safe_ref = pic_ref.replace("/", "_").replace("\\", "_").replace("#", "")
-        file_name = f"{doc_stem}_{int(time.time())}_{safe_ref}_page{page_index}{cleaned.extension}"
+        import hashlib
+
+        unique_hash = hashlib.sha256(f"{source_file}_{page_index}_{pic_ref}".encode()).hexdigest()[:12]
+        file_name = f"{doc_stem}_{unique_hash}_page{page_index}{cleaned.extension}"
 
         try:
             hosted_url = self._storage.upload(
