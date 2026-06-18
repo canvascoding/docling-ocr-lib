@@ -52,3 +52,5 @@ class DoclingConfig(BaseModel):
     batch_delay: float = 0.0
     max_num_pages: int | None = None
     max_file_size: int | None = None
+    images_scale: float = 2.0
+    image_format: str = "png"

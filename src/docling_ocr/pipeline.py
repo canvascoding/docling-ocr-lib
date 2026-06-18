@@ -19,6 +19,7 @@ from docling_ocr.models import (
 )
 from docling_ocr.storage.base import StorageBackend
 from docling_ocr.storage.local import LocalStorageBackend
+from docling_ocr.vlm_annotator import generate_vlm_annotations
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,8 @@ class DoclingPipeline:
         batch_delay: float = 0.0,
         max_num_pages: int | None = None,
         max_file_size: int | None = None,
+        images_scale: float = 2.0,
+        image_format: str = "png",
     ) -> None:
         self._storage = storage or LocalStorageBackend()
         self._batch_delay = batch_delay
@@ -71,17 +74,22 @@ class DoclingPipeline:
             batch_delay=batch_delay,
             max_num_pages=max_num_pages,
             max_file_size=max_file_size,
+            images_scale=images_scale,
+            image_format=image_format,
         )
 
         self._converter = DoclingConverter(self._config)
         logger.info(
             "DoclingPipeline initialized (pipeline=%s, storage=%s, "
-            "picture_annotations=%s, per_doc_subfolder=%s, batch_delay=%.1fs)",
+            "picture_annotations=%s, per_doc_subfolder=%s, batch_delay=%.1fs, "
+            "images_scale=%s, image_format=%s)",
             pipeline,
             type(self._storage).__name__,
             picture_annotations,
             per_doc_subfolder,
             batch_delay,
+            images_scale,
+            image_format,
         )
 
     def process(self, file_path: str | Path) -> list[ProcessedPage]:
@@ -115,7 +123,15 @@ class DoclingPipeline:
 
             annotations_map: dict[str, str] = {}
             if self._config.picture_annotations:
-                annotations_map = extract_annotations(document)
+                if self._config.pipeline == "vlm":
+                    logger.info("Generating VLM annotations for %d pictures", len(document.pictures))
+                    annotations_map = generate_vlm_annotations(
+                        document.pictures,
+                        self._config.annotation_config,
+                        self._config.artifacts_path,
+                    )
+                else:
+                    annotations_map = extract_annotations(document)
 
             result = self._process_document(document, source_file, doc_stem, annotations_map)
             return result

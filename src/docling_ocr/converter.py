@@ -60,7 +60,6 @@ class DoclingConverter:
             TableFormerMode,
             TableStructureOptions,
         )
-        from docling.document_converter import PdfFormatOption
 
         try:
             ocr_options: OcrOptions = RapidOcrOptions()
@@ -83,39 +82,13 @@ class DoclingConverter:
             do_table_structure=self._config.do_table_structure,
             table_structure_options=TableStructureOptions(do_cell_matching=True, mode=table_mode),
             generate_picture_images=self._config.generate_picture_images,
+            images_scale=self._config.images_scale,
         )
 
         if self._config.picture_annotations:
             self._apply_picture_description(pipeline_options)
-
-        return PdfFormatOption(pipeline_options=pipeline_options)
-
-    def _build_vlm_format_option(self):
-        from docling.datamodel import vlm_model_specs
-        from docling.datamodel.pipeline_options import VlmPipelineOptions
-        from docling.document_converter import PdfFormatOption
-        from docling.pipeline.vlm_pipeline import VlmPipeline
-
-        vlm_spec_name = VLM_MODEL_MAP.get(self._config.vlm_model, "GRANITEDOCLING_MLX")
-        vlm_options = getattr(vlm_model_specs, vlm_spec_name, vlm_model_specs.GRANITEDOCLING_MLX)
-
-        pipeline_options = VlmPipelineOptions(
-            vlm_options=vlm_options,
-            generate_page_images=self._config.generate_picture_images,
-        )
-
-        return PdfFormatOption(
-            pipeline_cls=VlmPipeline,
-            pipeline_options=pipeline_options,
-        )
-
-    def _apply_picture_description(self, pipeline_options) -> None:
-        from docling_ocr.annotator import build_picture_description_options
-
-        pipeline_options.do_picture_description = True
-        pipeline_options.picture_description_options = build_picture_description_options(self._config.annotation_config)
-        if not hasattr(pipeline_options, "images_scale") or pipeline_options.images_scale is None:
-            pipeline_options.images_scale = 2.0
+            if hasattr(pipeline_options, "images_scale") and pipeline_options.images_scale is None:
+                pipeline_options.images_scale = 2.0
 
     def convert(self, file_path: str | Path) -> Any:
         path = Path(file_path)
