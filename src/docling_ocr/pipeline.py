@@ -127,6 +127,7 @@ class DoclingPipeline:
                     logger.info("Generating VLM annotations for %d pictures", len(document.pictures))
                     annotations_map = generate_vlm_annotations(
                         document.pictures,
+                        document,
                         self._config.annotation_config,
                         self._config.artifacts_path,
                     )

@@ -11,15 +11,26 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_PROMPT = (
-    "Describe this image from a university lecture slide in 2-4 sentences. "
-    "Focus on the main message, any diagrams, charts, formulas, or key text visible. "
+DEFAULT_SYSTEM_PROMPT = (
+    "You are an expert assistant describing images from university lecture slides. "
+    "Describe each image accurately in 2-4 sentences. Focus on the main message, "
+    "any diagrams, charts, formulas, tables, graphs, or key text visible. "
     "Be concise but informative."
 )
 
+DEFAULT_USER_PROMPT = "Describe this image from a university lecture slide."
 
-def _load_image(picture: Image.Image) -> Image.Image:
-    return picture
+
+def _resolve_repo_id(model_name: str) -> str:
+    if model_name == "qwen25_vl_3b_mlx":
+        return "mlx-community/Qwen2.5-VL-3B-Instruct-bf16"
+    if model_name == "qwen25_vl_7b_mlx":
+        return "mlx-community/Qwen2.5-VL-7B-Instruct-bf16"
+    if model_name == "pixtral_12b_mlx":
+        return "mlx-community/pixtral-12b-bf16"
+    if model_name.startswith("mlx-community/") or "/" in model_name:
+        return model_name
+    return model_name
 
 
 def describe_image_with_mlx_vlm(
@@ -27,43 +38,30 @@ def describe_image_with_mlx_vlm(
     config: AnnotationConfig,
     artifacts_path: str | None = None,
 ) -> str:
-    """Describe an image using a local MLX-VLM model via mlx_vlm.
-
-    Supports preset names like 'qwen25_vl_3b_mlx', 'pixtral_12b', and repo_ids.
-    """
+    """Describe an image using a local MLX-VLM model via mlx_vlm."""
     try:
         from mlx_vlm import generate, load
     except ImportError as e:
         raise ImportError("mlx-vlm is required for local image annotation") from e
 
-    model_name = config.model
-    if model_name == "qwen25_vl_3b_mlx":
-        repo_id = "mlx-community/Qwen2.5-VL-3B-Instruct-bf16"
-    elif model_name == "qwen25_vl_7b_mlx":
-        repo_id = "mlx-community/Qwen2.5-VL-7B-Instruct-bf16"
-    elif model_name == "pixtral_12b_mlx":
-        repo_id = "mlx-community/pixtral-12b-bf16"
-    elif model_name.startswith("mlx-community/") or "/" in model_name:
-        repo_id = model_name
-    else:
-        repo_id = model_name
-
-    prompt = config.prompt or DEFAULT_PROMPT
+    repo_id = _resolve_repo_id(config.model)
+    system_prompt = config.prompt or DEFAULT_SYSTEM_PROMPT
+    user_prompt = DEFAULT_USER_PROMPT
 
     logger.info("Loading MLX-VLM annotation model: %s", repo_id)
     model, processor = load(repo_id)
 
-    # Convert PIL image to bytes for mlx_vlm
     buf = io.BytesIO()
     image.convert("RGB").save(buf, format="JPEG")
     buf.seek(0)
 
-    logger.debug("Generating annotation with prompt: %s", prompt[:100])
+    logger.debug("Generating annotation for image")
     output = generate(
         model,
         processor,
         image=buf,
-        prompt=prompt,
+        prompt=user_prompt,
+        system=system_prompt,
         verbose=False,
     )
 
@@ -74,6 +72,7 @@ def describe_image_with_mlx_vlm(
 
 def generate_vlm_annotations(
     pictures: list,
+    document: object,
     config: AnnotationConfig,
     artifacts_path: str | None = None,
 ) -> dict[str, str]:
@@ -81,6 +80,7 @@ def generate_vlm_annotations(
 
     Args:
         pictures: List of Docling picture objects.
+        document: The DoclingDocument containing the pictures.
         config: AnnotationConfig with model and prompt.
         artifacts_path: Optional local model artifacts path.
 
@@ -94,9 +94,13 @@ def generate_vlm_annotations(
     for i, picture in enumerate(pictures):
         ref = getattr(picture, "self_ref", "") or f"pic_{i}"
         try:
-            image = getattr(picture, "get_image", lambda: None)()
-            if image is None and hasattr(picture, "image"):
+            if hasattr(picture, "get_image"):
+                image = picture.get_image(document)
+            elif hasattr(picture, "image"):
                 image = picture.image
+            else:
+                image = None
+
             if image is None:
                 logger.warning("No image data for picture %s, skipping annotation", ref)
                 continue
