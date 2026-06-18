@@ -21,16 +21,35 @@ DEFAULT_SYSTEM_PROMPT = (
 DEFAULT_USER_PROMPT = "Describe this image from a university lecture slide."
 
 
-def _resolve_repo_id(model_name: str) -> str:
+def _resolve_repo_id(model_name: str, artifacts_path: str | None = None) -> str:
+    """Resolve model identifier to a path/loadable identifier.
+
+    For mlx-vlm, passing a local directory path works offline.
+    If the model cache has the model under a docling-style directory
+    (namespace--repo), use that directly.
+    """
+    repo_id = None
     if model_name == "qwen25_vl_3b_mlx":
-        return "mlx-community/Qwen2.5-VL-3B-Instruct-bf16"
-    if model_name == "qwen25_vl_7b_mlx":
-        return "mlx-community/Qwen2.5-VL-7B-Instruct-bf16"
-    if model_name == "pixtral_12b_mlx":
-        return "mlx-community/pixtral-12b-bf16"
-    if model_name.startswith("mlx-community/") or "/" in model_name:
-        return model_name
-    return model_name
+        repo_id = "mlx-community/Qwen2.5-VL-3B-Instruct-bf16"
+    elif model_name == "qwen25_vl_7b_mlx":
+        repo_id = "mlx-community/Qwen2.5-VL-7B-Instruct-bf16"
+    elif model_name == "pixtral_12b_mlx":
+        repo_id = "mlx-community/pixtral-12b-bf16"
+    elif model_name.startswith("mlx-community/") or "/" in model_name:
+        repo_id = model_name
+    else:
+        repo_id = model_name
+
+    if artifacts_path:
+        from pathlib import Path
+
+        sanitized = repo_id.replace("/", "--")
+        local_dir = Path(artifacts_path) / sanitized
+        if local_dir.exists():
+            logger.info("Using local model directory: %s", local_dir)
+            return str(local_dir)
+
+    return repo_id
 
 
 def describe_image_with_mlx_vlm(
@@ -44,7 +63,7 @@ def describe_image_with_mlx_vlm(
     except ImportError as e:
         raise ImportError("mlx-vlm is required for local image annotation") from e
 
-    repo_id = _resolve_repo_id(config.model)
+    repo_id = _resolve_repo_id(config.model, artifacts_path)
     system_prompt = config.prompt or DEFAULT_SYSTEM_PROMPT
     user_prompt = DEFAULT_USER_PROMPT
 
