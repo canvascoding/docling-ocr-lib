@@ -179,7 +179,7 @@ class DoclingPipeline:
         doc_stem: str,
         annotations_map: dict[str, str],
     ) -> list[ProcessedPage]:
-        page_count = document.num_pages()
+        page_count = max(document.num_pages(), 1)
         pages_data = self._build_page_index(document)
         processed: list[ProcessedPage] = []
 
@@ -237,7 +237,7 @@ class DoclingPipeline:
         page attribution is not available.
         """
         pages: dict[int, dict] = {}
-        page_count = document.num_pages()
+        page_count = max(document.num_pages(), 1)
 
         for page_no in range(page_count):
             pages[page_no] = {
