@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+env/
+.ENV
+
+# Environment variables (keep .env.example)
+.env
+.env.local
+.env.*.local
+
+# Output / generated files
+output/
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.tiff
+*.bmp
+
+# Model caches
+.cache/
+.docling/
+
+# Tool caches
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+.hatch/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

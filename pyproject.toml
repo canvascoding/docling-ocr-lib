@@ -1,0 +1,52 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "docling-ocr"
+version = "0.1.0"
+description = "Python library for local document OCR processing using Docling, with configurable storage backends"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+keywords = ["ocr", "docling", "pdf", "document-processing", "local", "offline"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "docling>=2.0",
+    "pydantic>=2.0",
+    "click>=8.0",
+    "python-dotenv>=1.0",
+    "Pillow>=10.0",
+]
+
+[project.optional-dependencies]
+s3 = ["boto3>=1.34"]
+dev = [
+    "pytest>=8.0",
+    "pytest-mock>=3.12",
+    "ruff>=0.4",
+]
+
+[project.scripts]
+docling-ocr = "docling_ocr.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/docling_ocr"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
