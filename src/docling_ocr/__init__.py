@@ -7,6 +7,7 @@ from docling_ocr.models import (
     AnnotationConfig,
     DoclingConfig,
     PageDimensions,
+    ProcessedDocument,
     ProcessedImage,
     ProcessedPage,
 )
@@ -24,6 +25,7 @@ __all__ = [
     "DoclingConfig",
     "AnnotationConfig",
     "PageDimensions",
+    "ProcessedDocument",
     "ProcessedImage",
     "ProcessedPage",
     "ImageProcessingResult",

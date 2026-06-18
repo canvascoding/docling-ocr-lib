@@ -3,6 +3,7 @@ from docling_ocr.models import (
     AnnotationConfig,
     DoclingConfig,
     PageDimensions,
+    ProcessedDocument,
     ProcessedImage,
     ProcessedPage,
 )
@@ -28,6 +29,14 @@ class TestModels:
         assert page.page_index == 0
         assert page.source_file == ""
         assert page.metadata == {}
+
+    def test_processed_document(self):
+        page = ProcessedPage(markdown="hello", source_file="lecture.pdf")
+        processed = ProcessedDocument(document={"raw": "docling-document"}, pages=[page], source_file="lecture.pdf")
+
+        assert processed.document == {"raw": "docling-document"}
+        assert processed.pages == [page]
+        assert processed.source_file == "lecture.pdf"
 
     def test_processed_image_defaults(self):
         img = ProcessedImage(original_id="img-0", file_name="a.png", hosted_url="http://example.com/a.png")

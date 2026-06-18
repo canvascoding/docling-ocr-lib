@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -24,6 +27,13 @@ class ProcessedPage(BaseModel):
     source_file: str = ""
     dimensions: PageDimensions | None = None
     metadata: dict = Field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class ProcessedDocument:
+    document: Any
+    pages: list[ProcessedPage]
+    source_file: str
 
 
 class AnnotationConfig(BaseModel):

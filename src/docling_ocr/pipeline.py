@@ -14,6 +14,7 @@ from docling_ocr.models import (
     AnnotationConfig,
     DoclingConfig,
     PageDimensions,
+    ProcessedDocument,
     ProcessedImage,
     ProcessedPage,
 )
@@ -93,6 +94,15 @@ class DoclingPipeline:
         )
 
     def process(self, file_path: str | Path) -> list[ProcessedPage]:
+        return self.process_with_document(file_path).pages
+
+    def process_with_document(self, file_path: str | Path) -> ProcessedDocument:
+        """Process a document and return both Docling's native document and exported pages.
+
+        This is useful for downstream RAG pipelines that want to use Docling's
+        native chunkers and provenance metadata while still reusing this
+        pipeline's image extraction, annotations, and storage backends.
+        """
         path = Path(file_path)
         source_file = path.name
         doc_stem = path.stem
@@ -135,7 +145,7 @@ class DoclingPipeline:
                     annotations_map = extract_annotations(document)
 
             result = self._process_document(document, source_file, doc_stem, annotations_map)
-            return result
+            return ProcessedDocument(document=document, pages=result, source_file=source_file)
         finally:
             if original_storage_dir is not None and isinstance(self._storage, LocalStorageBackend):
                 self._storage._output_dir = original_storage_dir
