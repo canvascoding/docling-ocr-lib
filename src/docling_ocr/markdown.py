@@ -38,7 +38,7 @@ def replace_image_references(
             hosted_replacement += f"\n\n{_format_image_annotation(image.image_annotation)}"
 
         for pattern in local_patterns:
-            new_markdown = pattern.sub(hosted_replacement, markdown, count=1)
+            new_markdown = pattern.sub(lambda _match: hosted_replacement, markdown, count=1)
             if new_markdown != markdown:
                 logger.debug("Replaced image reference for '%s' -> %s", image.original_id, image.hosted_url)
             markdown = new_markdown

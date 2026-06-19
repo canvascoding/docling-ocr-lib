@@ -89,6 +89,21 @@ class TestReplaceImageReferences:
             == "> **Bildbeschreibung:** A chart. It shows growth."
         )
 
+    def test_replacement_keeps_backslashes_literal(self):
+        md = "![img-0](img-0)"
+        images = [
+            ProcessedImage(
+                original_id="img-0",
+                file_name="a.png",
+                image_annotation=r"A formula contains \partial and \pi terms.",
+                hosted_url=r"https://example.com/path\picture.png",
+            )
+        ]
+        result = replace_image_references(md, images)
+        assert r"https://example.com/path\picture.png" in result
+        assert r"\partial" in result
+        assert r"\pi" in result
+
     def test_empty_label_placeholder(self):
         md = "![](pic_ref_0)"
         images = [
