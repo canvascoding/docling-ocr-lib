@@ -14,13 +14,17 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 DEFAULT_SYSTEM_PROMPT = (
-    "You are an expert assistant describing images from university lecture slides. "
-    "Describe each image accurately in one concise sentence. Focus only on the "
-    "main chart, diagram, table, formula, graph, or visible key message. Do not speculate."
+    "Du beschreibst Bilder aus Uni-Unterlagen präzise für ein RAG-System. "
+    "Bei Diagrammen, Tabellen, Frameworks, Modellen, Formeln oder Foliengrafiken "
+    "beschreibst du in 2-3 kurzen Sätzen Bildtyp, sichtbare Struktur, zentrale Aussage "
+    "und wichtige sichtbare Fachbegriffe. Bei einfachen Fotos reicht ein klarer Satz. "
+    "Wenn es nur ein Logo, Icon, Wasserzeichen oder dekoratives Bild ist, antworte sehr "
+    "kurz und beginne mit 'Logo/dekoratives Bild:'. Erfinde keine nicht sichtbaren Werte. "
+    "Gib nur reinen Text ohne Markdown zurück."
 )
 
-DEFAULT_USER_PROMPT = "Describe this image from a university lecture slide."
-DEFAULT_MAX_TOKENS = 80
+DEFAULT_USER_PROMPT = "Beschreibe dieses Bild aus einer Uni-Unterlage für eine spätere Lernantwort."
+DEFAULT_MAX_TOKENS = 140
 _MODEL_CACHE: dict[str, tuple[object, object]] = {}
 _WHITESPACE_RE = re.compile(r"\s+")
 

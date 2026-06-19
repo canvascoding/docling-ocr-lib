@@ -82,6 +82,7 @@ class DoclingConverter:
             ocr_options=ocr_options,
             do_table_structure=self._config.do_table_structure,
             table_structure_options=TableStructureOptions(do_cell_matching=True, mode=table_mode),
+            generate_page_images=self._config.generate_page_previews,
             generate_picture_images=self._config.generate_picture_images,
             images_scale=self._config.images_scale,
         )
@@ -102,7 +103,7 @@ class DoclingConverter:
 
         pipeline_options = VlmPipelineOptions(
             vlm_options=vlm_options,
-            generate_page_images=self._config.generate_picture_images,
+            generate_page_images=True,
         )
 
         return PdfFormatOption(

@@ -8,6 +8,13 @@ from docling_ocr.models import ProcessedImage
 logger = logging.getLogger(__name__)
 
 
+def _format_image_annotation(annotation: str) -> str:
+    cleaned = re.sub(r"\s+", " ", annotation).strip()
+    if not cleaned:
+        return ""
+    return f"> **Bildbeschreibung:** {cleaned}"
+
+
 def replace_image_references(
     markdown: str,
     images: list[ProcessedImage],
@@ -28,7 +35,7 @@ def replace_image_references(
 
         hosted_replacement = f"![{image.original_id}]({image.hosted_url})"
         if image.image_annotation:
-            hosted_replacement += f"\n\n{image.image_annotation}"
+            hosted_replacement += f"\n\n{_format_image_annotation(image.image_annotation)}"
 
         for pattern in local_patterns:
             new_markdown = pattern.sub(hosted_replacement, markdown, count=1)

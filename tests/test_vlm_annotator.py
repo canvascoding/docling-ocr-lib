@@ -177,8 +177,10 @@ def test_describe_image_with_mlx_vlm_uses_temp_image_path_and_chat_template(monk
     assert calls["repo_id"] == "mlx-community/Qwen2.5-VL-3B-Instruct-bf16"
     assert calls["num_images"] == 1
     assert calls["prompt"] == "formatted prompt"
-    assert calls["max_tokens"] == 80
+    assert calls["max_tokens"] == 140
     assert calls["temperature"] == 0.0
     assert calls["verbose"] is False
     assert calls["messages"][0]["role"] == "system"
+    assert "Diagrammen" in calls["messages"][0]["content"]
+    assert "Logo/dekoratives Bild" in calls["messages"][0]["content"]
     assert calls["messages"][1]["role"] == "user"

@@ -3,7 +3,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Code style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
-[![Tests: 26](https://img.shields.io/badge/tests-26%20passed-brightgreen.svg)]()
+[![Tests: 39](https://img.shields.io/badge/tests-39%20passed-brightgreen.svg)]()
 [![Docling](https://img.shields.io/badge/powered%20by-Docling-8A2BE2.svg)](https://github.com/docling-project/docling)
 
 Python library for **local** document processing using [Docling](https://github.com/docling-project/docling). Drop-in alternative to `mistral-ocr-lib` — same output structures (`ProcessedPage`, `ProcessedImage`), but runs entirely on your machine without API keys or cloud costs.
@@ -36,8 +36,9 @@ Python library for **local** document processing using [Docling](https://github.
   - `vlm` — GraniteDocling VLM on Apple Silicon MLX (best for scanned docs)
 - **Picture annotations** (optional) — VLM-generated descriptions for each image, like Mistral's annotations. Default: Qwen2.5-VL-3B MLX
 - Image extraction with PIL → storage (local or S3)
+- Optional page previews — render each processed page/slide as a stored image for RAG and visual learning use cases
 - `<!-- PAGE N -->` markers in markdown for page traceability
-- Metadata JSON output per document with image mapping and dimensions
+- Metadata JSON output per document with image mapping, page previews, image classification, and dimensions
 - Configurable storage backends (local filesystem or S3)
 - Per-document subfolder output to avoid file collisions
 - Batch processing with configurable delay
@@ -90,6 +91,24 @@ for page in pages:
             print(f"  Annotation: {img.image_annotation}")
 ```
 
+### Page Previews for RAG
+
+For slide decks or learning material, enable page previews so every processed PDF page is also stored as an image. This is useful when the original PDF page itself is the visual source, not only embedded pictures inside the page.
+
+```python
+from docling_ocr import DoclingPipeline, LocalStorageBackend
+
+with DoclingPipeline(
+    storage=LocalStorageBackend("./output"),
+    generate_page_previews=True,
+) as pipeline:
+    pages = pipeline.process("slides.pdf")
+
+for page in pages:
+    if page.page_preview:
+        print(page.page_preview.hosted_url)
+```
+
 ### VLM Pipeline (best for scanned documents)
 
 ```python
@@ -109,8 +128,10 @@ with DoclingPipeline(
 from docling_ocr import DoclingPipeline, LocalStorageBackend, AnnotationConfig
 
 annotation = AnnotationConfig(
-    prompt="Beschreibe jedes visuelle Element in 2-3 Sätzen.",
+    prompt="Beschreibe Diagramme, Tabellen und Frameworks in 2-3 kurzen Sätzen. Logos nur sehr kurz markieren.",
     model="qwen25_vl_3b_mlx",  # default, runs on MLX
+    max_tokens=140,
+    max_chars=650,
 )
 
 with DoclingPipeline(
@@ -197,6 +218,9 @@ docling-ocr process scanned.pdf --pipeline vlm
 # Enable picture annotations
 docling-ocr process document.pdf --picture-annotations
 
+# Store one rendered image per page/slide
+docling-ocr process slides.pdf --page-previews
+
 # Custom annotation model
 docling-ocr process document.pdf --picture-annotations --annotation-model granite_vision
 
@@ -226,7 +250,7 @@ docling-ocr process document.pdf --output-dir ./results
 
 For each document, two files are created in the output directory:
 
-1. `{filename}.md` — Combined markdown from all pages (with `<!-- PAGE N -->` markers)
+1. `{filename}.md` — Combined markdown from all pages (with `<!-- PAGE N -->` markers). Image annotations are written as `> **Bildbeschreibung:** ...` blockquotes so they stay visually separate from source text.
 2. `{filename}_metadata.json` — Machine-readable metadata
 
 Example metadata JSON:
@@ -250,9 +274,22 @@ Example metadata JSON:
           "file_name": "document_1718000000_#/pictures/0_page0.png",
           "hosted_url": "/path/to/output/document/document_1718000000_#/pictures/0_page0.png",
           "content_type": "image/png",
-          "image_annotation": "A bar chart showing quarterly revenue"
+          "image_annotation": "A bar chart showing quarterly revenue",
+          "image_kind": "chart",
+          "content_image": true,
+          "low_value": false
         }
-      ]
+      ],
+      "page_preview": {
+        "original_id": "#/pages/1",
+        "file_name": "document_abc123_page0_preview.png",
+        "hosted_url": "/path/to/output/document/document_abc123_page0_preview.png",
+        "content_type": "image/png",
+        "image_annotation": "Page preview for page 1.",
+        "image_kind": "page_preview",
+        "content_image": true,
+        "low_value": false
+      }
     }
   ]
 }
@@ -279,6 +316,8 @@ Annotations are **orthogonal** to the pipeline choice — you can combine:
 | standard | on | Digital PDFs + VLM image descriptions |
 | vlm | off | Best OCR for scanned docs |
 | vlm | on | Maximum quality, slowest |
+
+The default annotation prompt writes German plain-text descriptions. It keeps simple photos short, gives charts/tables/diagrams enough structure for learning, and marks pure logos/decorative images briefly as low-value visual context.
 
 **Annotation models (local, MLX):**
 - `qwen25_vl_3b_mlx` (default) — 3B, ~23s/image, good general-purpose

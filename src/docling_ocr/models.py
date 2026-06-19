@@ -18,11 +18,15 @@ class ProcessedImage(BaseModel):
     image_annotation: str = ""
     hosted_url: str
     content_type: str = "image/jpeg"
+    image_kind: str = "picture"
+    content_image: bool = True
+    low_value: bool = False
 
 
 class ProcessedPage(BaseModel):
     markdown: str = ""
     images: list[ProcessedImage] = Field(default_factory=list)
+    page_preview: ProcessedImage | None = None
     page_index: int = 0
     source_file: str = ""
     dimensions: PageDimensions | None = None
@@ -38,15 +42,20 @@ class ProcessedDocument:
 
 class AnnotationConfig(BaseModel):
     prompt: str = (
-        "Describe this visual element in one short, precise sentence. Focus only on the "
-        "main chart, diagram, table, formula, graph, or visible key message. If it is only "
-        "a logo, icon, or decorative image, say that briefly."
+        "Beschreibe dieses visuelle Element aus Uni-Unterlagen präzise auf Deutsch. "
+        "Bei Diagrammen, Tabellen, Frameworks, Modellen, Formeln oder Foliengrafiken: "
+        "schreibe 2-3 kurze Sätze mit Bildtyp, sichtbaren Achsen/Kategorien/Beziehungen, "
+        "zentraler Aussage und wichtigen sichtbaren Fachbegriffen. Bei einfachen Fotos oder "
+        "Produktbildern reicht ein klarer Satz. Wenn es nur ein Logo, Icon, Wasserzeichen "
+        "oder dekoratives Bild ist, antworte sehr kurz und beginne mit "
+        "'Logo/dekoratives Bild:'. Erfinde keine Zahlen oder Aussagen, die nicht sichtbar sind. "
+        "Gib nur reinen Text ohne Markdown zurück."
     )
     model: str = "qwen25_vl_3b_mlx"
     remote_api_url: str | None = None
     remote_api_key: str | None = None
-    max_tokens: int = 80
-    max_chars: int = 280
+    max_tokens: int = 140
+    max_chars: int = 650
     skip_small_images: bool = True
     min_area_ratio: float = 0.015
 
@@ -60,6 +69,7 @@ class DoclingConfig(BaseModel):
     do_table_structure: bool = True
     table_structure_mode: str = "accurate"
     generate_picture_images: bool = True
+    generate_page_previews: bool = False
     do_ocr: bool = True
     ocr_languages: list[str] = Field(default_factory=lambda: ["en", "de"])
     per_doc_subfolder: bool = True

@@ -8,7 +8,7 @@ from typing import Any
 from docling_ocr.annotator import extract_annotations
 from docling_ocr.converter import DoclingConverter
 from docling_ocr.exceptions import ConversionError, DoclingOCRError, StorageError
-from docling_ocr.image_utils import extract_image_bytes
+from docling_ocr.image_utils import extract_image_bytes, pil_image_to_bytes
 from docling_ocr.markdown import replace_image_references
 from docling_ocr.models import (
     AnnotationConfig,
@@ -47,6 +47,7 @@ class DoclingPipeline:
         do_table_structure: bool = True,
         table_structure_mode: str = "accurate",
         generate_picture_images: bool = True,
+        generate_page_previews: bool = False,
         do_ocr: bool = True,
         ocr_languages: list[str] | None = None,
         per_doc_subfolder: bool = True,
@@ -69,6 +70,7 @@ class DoclingPipeline:
             do_table_structure=do_table_structure,
             table_structure_mode=table_structure_mode,
             generate_picture_images=generate_picture_images,
+            generate_page_previews=generate_page_previews,
             do_ocr=do_ocr,
             ocr_languages=ocr_languages or ["en", "de"],
             per_doc_subfolder=per_doc_subfolder,
@@ -83,7 +85,7 @@ class DoclingPipeline:
         logger.info(
             "DoclingPipeline initialized (pipeline=%s, storage=%s, "
             "picture_annotations=%s, per_doc_subfolder=%s, batch_delay=%.1fs, "
-            "images_scale=%s, image_format=%s)",
+            "images_scale=%s, image_format=%s, page_previews=%s)",
             pipeline,
             type(self._storage).__name__,
             picture_annotations,
@@ -91,6 +93,7 @@ class DoclingPipeline:
             batch_delay,
             images_scale,
             image_format,
+            generate_page_previews,
         )
 
     def process(self, file_path: str | Path) -> list[ProcessedPage]:
@@ -193,6 +196,7 @@ class DoclingPipeline:
             page_info = pages_data.get(page_idx, {})
             page_markdown = page_info.get("markdown", "")
             page_pictures = page_info.get("pictures", [])
+            page_item = page_info.get("page_item")
 
             processed_images: list[ProcessedImage] = []
             for pic_ref in page_pictures:
@@ -208,6 +212,15 @@ class DoclingPipeline:
             if processed_images:
                 page_markdown = replace_image_references(page_markdown, processed_images)
 
+            page_preview = None
+            if self._config.generate_page_previews:
+                page_preview = self._extract_and_upload_page_preview(
+                    page_item=page_item,
+                    page_index=page_idx,
+                    source_file=source_file,
+                    doc_stem=doc_stem,
+                )
+
             page_marker = f"\n\n<!-- PAGE {page_idx} -->\n\n"
             page_markdown = page_marker + page_markdown
 
@@ -217,6 +230,7 @@ class DoclingPipeline:
                 ProcessedPage(
                     markdown=page_markdown,
                     images=processed_images,
+                    page_preview=page_preview,
                     page_index=page_idx,
                     source_file=source_file,
                     dimensions=dimensions,
@@ -244,12 +258,14 @@ class DoclingPipeline:
                 "markdown": "",
                 "pictures": [],
                 "dimensions": None,
+                "page_item": None,
             }
 
         for page_no, page_item in (document.pages or {}).items():
             idx = page_no - 1 if page_no >= 1 else page_no
             if idx not in pages:
-                pages[idx] = {"markdown": "", "pictures": [], "dimensions": None}
+                pages[idx] = {"markdown": "", "pictures": [], "dimensions": None, "page_item": None}
+            pages[idx]["page_item"] = page_item
 
             size = getattr(page_item, "size", None)
             if size:
@@ -309,6 +325,56 @@ class DoclingPipeline:
             return text
 
         return ""
+
+    def _extract_and_upload_page_preview(
+        self,
+        *,
+        page_item: Any,
+        page_index: int,
+        source_file: str,
+        doc_stem: str,
+    ) -> ProcessedImage | None:
+        image_ref = getattr(page_item, "image", None)
+        if image_ref is None:
+            logger.debug("No page preview image available for page %d", page_index)
+            return None
+
+        try:
+            pil_image = image_ref.pil_image
+            if pil_image is None:
+                logger.debug("Page preview ImageRef returned no PIL image for page %d", page_index)
+                return None
+            cleaned = pil_image_to_bytes(pil_image)
+        except Exception as e:
+            logger.warning("Failed to extract page preview on page %d: %s", page_index, e)
+            return None
+
+        import hashlib
+
+        unique_hash = hashlib.sha256(f"{source_file}_{page_index}_page_preview".encode()).hexdigest()[:12]
+        file_name = f"{doc_stem}_{unique_hash}_page{page_index}_preview{cleaned.extension}"
+
+        try:
+            hosted_url = self._storage.upload(
+                file_data=cleaned.data,
+                filename=file_name,
+                content_type=cleaned.content_type,
+            )
+        except StorageError as e:
+            logger.error("Failed to upload page preview on page %d: %s", page_index, e)
+            return None
+
+        logger.debug("Uploaded page preview for page %d -> %s", page_index, hosted_url)
+        return ProcessedImage(
+            original_id=f"#/pages/{page_index + 1}",
+            file_name=file_name,
+            image_annotation=f"Page preview for page {page_index + 1}.",
+            hosted_url=hosted_url,
+            content_type=cleaned.content_type,
+            image_kind="page_preview",
+            content_image=True,
+            low_value=False,
+        )
 
     def _extract_and_upload_image(
         self,

@@ -26,6 +26,7 @@ class TestModels:
         page = ProcessedPage()
         assert page.markdown == ""
         assert page.images == []
+        assert page.page_preview is None
         assert page.page_index == 0
         assert page.source_file == ""
         assert page.metadata == {}
@@ -42,6 +43,9 @@ class TestModels:
         img = ProcessedImage(original_id="img-0", file_name="a.png", hosted_url="http://example.com/a.png")
         assert img.image_annotation == ""
         assert img.content_type == "image/jpeg"
+        assert img.image_kind == "picture"
+        assert img.content_image is True
+        assert img.low_value is False
 
     def test_page_dimensions(self):
         dims = PageDimensions(dpi=72, height=800, width=600)
@@ -52,7 +56,9 @@ class TestModels:
     def test_annotation_config_defaults(self):
         config = AnnotationConfig()
         assert config.model == "qwen25_vl_3b_mlx"
-        assert "visual element" in config.prompt.lower()
+        assert "visuelle element" in config.prompt.lower()
+        assert config.max_tokens == 140
+        assert config.max_chars == 650
 
     def test_docling_config_defaults(self):
         config = DoclingConfig()
@@ -62,6 +68,7 @@ class TestModels:
         assert config.do_table_structure is True
         assert config.table_structure_mode == "accurate"
         assert config.generate_picture_images is True
+        assert config.generate_page_previews is False
         assert config.do_ocr is True
         assert config.per_doc_subfolder is True
         assert config.batch_delay == 0.0

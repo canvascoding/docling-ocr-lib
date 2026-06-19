@@ -1,4 +1,4 @@
-from docling_ocr.markdown import replace_image_references
+from docling_ocr.markdown import _format_image_annotation, replace_image_references
 from docling_ocr.models import ProcessedImage
 
 
@@ -20,7 +20,7 @@ class TestReplaceImageReferences:
         ]
         result = replace_image_references(md, images)
         assert "https://bucket.s3.eu-central-1.amazonaws.com/123_img-0.png" in result
-        assert "A chart showing sales data" in result
+        assert "> **Bildbeschreibung:** A chart showing sales data" in result
 
     def test_image_empty_parens(self):
         md = "![img-0]()"
@@ -54,8 +54,8 @@ class TestReplaceImageReferences:
         result = replace_image_references(md, images)
         assert "![img-0](https://example.com/a.png)" in result
         assert "![img-1](https://example.com/b.png)" in result
-        assert "Chart" in result
-        assert "Table" in result
+        assert "> **Bildbeschreibung:** Chart" in result
+        assert "> **Bildbeschreibung:** Table" in result
 
     def test_image_without_annotation(self):
         md = "![img-0](img-0)"
@@ -82,6 +82,12 @@ class TestReplaceImageReferences:
         ]
         result = replace_image_references(md, images)
         assert "https://example.com/a.png" in result
+
+    def test_annotation_format_is_visibly_separate_from_slide_text(self):
+        assert (
+            _format_image_annotation(" A chart.\nIt shows growth. ")
+            == "> **Bildbeschreibung:** A chart. It shows growth."
+        )
 
     def test_empty_label_placeholder(self):
         md = "![](pic_ref_0)"

@@ -9,7 +9,7 @@ import click
 from dotenv import load_dotenv
 
 from docling_ocr.exceptions import DoclingOCRError
-from docling_ocr.models import AnnotationConfig, ProcessedPage
+from docling_ocr.models import AnnotationConfig, ProcessedImage, ProcessedPage
 from docling_ocr.pipeline import DoclingPipeline
 from docling_ocr.storage.local import LocalStorageBackend
 from docling_ocr.storage.s3 import S3StorageBackend
@@ -38,6 +38,19 @@ SUPPORTED_EXTENSIONS = {
     ".bmp",
     ".webp",
 }
+
+
+def _image_metadata(img: ProcessedImage) -> dict:
+    return {
+        "original_id": img.original_id,
+        "file_name": img.file_name,
+        "hosted_url": img.hosted_url,
+        "content_type": img.content_type,
+        "image_annotation": img.image_annotation,
+        "image_kind": img.image_kind,
+        "content_image": img.content_image,
+        "low_value": img.low_value,
+    }
 
 
 def _get_storage(
@@ -82,17 +95,10 @@ def _save_results(pages: list[ProcessedPage], output_dir: str, doc_name: str) ->
         page_entry: dict = {
             "page_index": p.page_index,
             "source_file": p.source_file,
-            "images": [
-                {
-                    "original_id": img.original_id,
-                    "file_name": img.file_name,
-                    "hosted_url": img.hosted_url,
-                    "content_type": img.content_type,
-                    "image_annotation": img.image_annotation,
-                }
-                for img in p.images
-            ],
+            "images": [_image_metadata(img) for img in p.images],
         }
+        if p.page_preview:
+            page_entry["page_preview"] = _image_metadata(p.page_preview)
         if p.dimensions:
             page_entry["dimensions"] = {
                 "dpi": p.dimensions.dpi,
@@ -199,6 +205,7 @@ def main(verbose: bool) -> None:
 @click.option("--no-ocr", is_flag=True, help="Disable OCR (text-layer only)")
 @click.option("--max-pages", type=int, default=None, help="Max pages to process")
 @click.option("--max-file-size", type=int, default=None, help="Max file size in bytes")
+@click.option("--page-previews", is_flag=True, help="Store one rendered preview image per processed page")
 @click.option("--no-subfolder", is_flag=True, help="Disable per-doc subfolder in output")
 def process(
     file: str,
@@ -223,6 +230,7 @@ def process(
     no_ocr: bool,
     max_pages: int | None,
     max_file_size: int | None,
+    page_previews: bool,
     no_subfolder: bool,
 ) -> None:
     storage_backend = _get_storage(
@@ -257,6 +265,7 @@ def process(
             per_doc_subfolder=not no_subfolder,
             max_num_pages=max_pages,
             max_file_size=max_file_size,
+            generate_page_previews=page_previews,
         ) as pl:
             pages = pl.process(file)
             _save_results(pages, output_dir, file)
@@ -311,6 +320,7 @@ def process(
 @click.option("--artifacts-path", envvar="DOCLING_ARTIFACTS_PATH", default=None, help="Local model artifacts path")
 @click.option("--no-ocr", is_flag=True, help="Disable OCR (text-layer only)")
 @click.option("--batch-delay", default=0.0, help="Delay between files in seconds")
+@click.option("--page-previews", is_flag=True, help="Store one rendered preview image per processed page")
 @click.option("--no-subfolder", is_flag=True, help="Disable per-doc subfolder in output")
 def batch(
     directory: str,
@@ -333,6 +343,7 @@ def batch(
     artifacts_path: str | None,
     no_ocr: bool,
     batch_delay: float,
+    page_previews: bool,
     no_subfolder: bool,
 ) -> None:
     doc_dir = Path(directory)
@@ -373,6 +384,7 @@ def batch(
         do_ocr=not no_ocr,
         batch_delay=batch_delay,
         per_doc_subfolder=not no_subfolder,
+        generate_page_previews=page_previews,
     ) as pl:
         for doc_path in doc_files:
             click.echo(f"Processing {doc_path.name}...")
