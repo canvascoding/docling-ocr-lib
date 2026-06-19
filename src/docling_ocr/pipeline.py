@@ -20,9 +20,15 @@ from docling_ocr.models import (
 )
 from docling_ocr.storage.base import StorageBackend
 from docling_ocr.storage.local import LocalStorageBackend
+from docling_ocr.storage.paths import sanitize_filename
 from docling_ocr.vlm_annotator import generate_vlm_annotations
 
 logger = logging.getLogger(__name__)
+
+
+def _artifact_filename(doc_stem: str, unique_hash: str, page_index: int, extension: str, suffix: str = "") -> str:
+    safe_doc_stem = sanitize_filename(doc_stem, default="document")
+    return sanitize_filename(f"{safe_doc_stem}_{unique_hash}_page{page_index}{suffix}{extension}")
 
 
 class DoclingPipeline:
@@ -352,7 +358,7 @@ class DoclingPipeline:
         import hashlib
 
         unique_hash = hashlib.sha256(f"{source_file}_{page_index}_page_preview".encode()).hexdigest()[:12]
-        file_name = f"{doc_stem}_{unique_hash}_page{page_index}_preview{cleaned.extension}"
+        file_name = _artifact_filename(doc_stem, unique_hash, page_index, cleaned.extension, "_preview")
 
         try:
             hosted_url = self._storage.upload(
@@ -395,7 +401,7 @@ class DoclingPipeline:
         import hashlib
 
         unique_hash = hashlib.sha256(f"{source_file}_{page_index}_{pic_ref}".encode()).hexdigest()[:12]
-        file_name = f"{doc_stem}_{unique_hash}_page{page_index}{cleaned.extension}"
+        file_name = _artifact_filename(doc_stem, unique_hash, page_index, cleaned.extension)
 
         try:
             hosted_url = self._storage.upload(

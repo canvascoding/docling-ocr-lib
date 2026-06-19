@@ -4,6 +4,7 @@ import logging
 
 from docling_ocr.exceptions import StorageError
 from docling_ocr.storage.base import StorageBackend
+from docling_ocr.storage.paths import quote_storage_key, sanitize_filename
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +57,8 @@ class S3StorageBackend(StorageBackend):
         return f"https://{self._bucket}.s3.{self._region}.amazonaws.com"
 
     def upload(self, file_data: bytes, filename: str, content_type: str = "image/png") -> str:
-        key = f"{self._prefix}/{filename}" if self._prefix else filename
+        safe_filename = sanitize_filename(filename)
+        key = f"{self._prefix}/{safe_filename}" if self._prefix else safe_filename
         logger.debug("Uploading to S3: bucket=%s key=%s (%d bytes)", self._bucket, key, len(file_data))
         try:
             self._s3_client.put_object(
@@ -69,7 +71,7 @@ class S3StorageBackend(StorageBackend):
             logger.error("S3 upload failed: bucket=%s key=%s error=%s", self._bucket, key, e)
             raise StorageError(f"Failed to upload to S3 (bucket={self._bucket}, key={key}): {e}") from e
 
-        url = f"{self.base_url}/{key}"
+        url = f"{self.base_url}/{quote_storage_key(key)}"
         logger.info("File uploaded to S3: %s", url)
         return url
 

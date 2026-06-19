@@ -25,8 +25,8 @@ def test_extract_and_upload_page_preview(tmp_path):
     preview = pipeline._extract_and_upload_page_preview(
         page_item=_FakePageItem(),
         page_index=2,
-        source_file="slides.pdf",
-        doc_stem="slides",
+        source_file="EoI B.pdf",
+        doc_stem="EoI B",
     )
 
     assert preview is not None
@@ -35,4 +35,6 @@ def test_extract_and_upload_page_preview(tmp_path):
     assert preview.content_image is True
     assert preview.low_value is False
     assert preview.content_type == "image/png"
+    assert " " not in preview.file_name
+    assert preview.file_name.startswith("EoI_B_")
     assert preview.hosted_url.endswith("_page2_preview.png")

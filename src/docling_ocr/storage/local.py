@@ -5,6 +5,7 @@ from pathlib import Path
 
 from docling_ocr.exceptions import StorageError
 from docling_ocr.storage.base import StorageBackend
+from docling_ocr.storage.paths import sanitize_filename
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,8 @@ class LocalStorageBackend(StorageBackend):
     def upload(self, file_data: bytes, filename: str, content_type: str = "image/png") -> str:
         target_dir = self.effective_output_dir
         target_dir.mkdir(parents=True, exist_ok=True)
-        file_path = target_dir / filename
+        safe_filename = sanitize_filename(filename)
+        file_path = target_dir / safe_filename
         logger.debug("Saving file locally: %s (%d bytes)", file_path, len(file_data))
         try:
             file_path.write_bytes(file_data)
